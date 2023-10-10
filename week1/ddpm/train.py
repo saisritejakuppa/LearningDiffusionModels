@@ -6,10 +6,11 @@ from tqdm import tqdm
 from torch import optim
 from utils import *
 from model import UNet
+import wandb
 import logging
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s", level=logging.INFO, datefmt="%I:%M:%S")
-
+from logzero import logger
 
 class Diffusion:
     def __init__(self, noise_steps=1000, beta_start=1e-4, beta_end=0.02, img_size=256, device="cuda"):
@@ -68,12 +69,15 @@ def train(args):
     optimizer = optim.AdamW(model.parameters(), lr=args.lr)
     mse = nn.MSELoss()
     diffusion = Diffusion(img_size=args.image_size, device=device)
-    logger = SummaryWriter(os.path.join("runs", args.run_name))
     l = len(dataloader)
+    logger.info(f"Starting training for {args.epochs} epochs")
 
     for epoch in range(args.epochs):
         logging.info(f"Starting epoch {epoch}:")
         pbar = tqdm(dataloader)
+
+        total_mean = 0
+
         for i, (images, _) in enumerate(pbar):
             images = images.to(device)
             t = diffusion.sample_timesteps(images.shape[0]).to(device)
@@ -86,10 +90,17 @@ def train(args):
             optimizer.step()
 
             pbar.set_postfix(MSE=loss.item())
-            logger.add_scalar("MSE", loss.item(), global_step=epoch * l + i)
+            # wandb.log({"MSE": loss.item()})
+            total_mean += loss.item()
+        
+        
+        # wandb.log({"epoch": epoch})
+        # wandb.log({"MSE": total_mean / l})
+
 
         sampled_images = diffusion.sample(model, n=images.shape[0])
         save_images(sampled_images, os.path.join("results", args.run_name, f"{epoch}.jpg"))
+        # wandb.log({"sampled_images": [wandb.Image(i) for i in sampled_images]})
         torch.save(model.state_dict(), os.path.join("models", args.run_name, f"ckpt.pt"))
 
 
@@ -100,11 +111,12 @@ def launch():
     args = parser.parse_args()
     args.run_name = "DDPM_Uncondtional"
     args.epochs = 500
-    args.batch_size = 12
+    args.batch_size = 4
     args.image_size = 64
-    args.dataset_path = r"C:\Users\dome\datasets\landscape_img_folder"
+    args.dataset_path = r"curated_dataset"
     args.device = "cuda"
     args.lr = 3e-4
+    # wandb.init(project="diffusion", name=args.run_name)
     train(args)
 
 
