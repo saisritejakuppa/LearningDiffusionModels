@@ -1,10 +1,9 @@
 # download the standford cars dataset from torch
 
-# import torch
-# import torchvision
-# dataset = torchvision.datasets.Food101('./dataset', download = True)
-# print("done downloading")
-
+import torch
+import torchvision
+dataset = torchvision.datasets.Food101('./dataset', download = True)
+print("done downloading")
 
 import os
 import shutil
